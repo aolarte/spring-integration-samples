@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:int="http://www.springframework.org/schema/integration"
+       xsi:schemaLocation="
+   http://www.springframework.org/schema/beans
+   http://www.springframework.org/schema/beans/spring-beans.xsd
+   http://www.springframework.org/schema/integration
+   http://www.springframework.org/schema/integration/spring-integration.xsd
+  ">
+
+    <bean id="orderServiceHandler" class="com.javaprocess.examples.integration.impl.OrderServiceHandler"/>
+
+    <int:channel id="requestChannel"/>
+
+    <int:gateway id="orderService"
+                 service-interface="com.javaprocess.examples.integration.interfaces.IOrderService"
+                 default-request-channel="requestChannel" />
+
+    <int:service-activator input-channel="requestChannel"
+                           ref="orderServiceHandler" method="processOrder" />
+
+    <bean id="app" class="com.javaprocess.examples.integration.impl.App">
+        <property name="orderService" ref="orderService"/>
+    </bean>
+
+</beans>
