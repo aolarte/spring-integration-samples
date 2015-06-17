@@ -3,6 +3,7 @@
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xmlns:int="http://www.springframework.org/schema/integration"
        xmlns:int-jms="http://www.springframework.org/schema/integration/jms"
+       xmlns:int-jdbc="http://www.springframework.org/schema/integration/jdbc"
        xsi:schemaLocation="
    http://www.springframework.org/schema/beans
    http://www.springframework.org/schema/beans/spring-beans.xsd
@@ -10,16 +11,29 @@
    http://www.springframework.org/schema/integration/spring-integration.xsd
    http://www.springframework.org/schema/integration/jms
    http://www.springframework.org/schema/integration/jms/spring-integration-jms.xsd
+   http://www.springframework.org/schema/integration/jdbc
+   http://www.springframework.org/schema/integration/jdbc/spring-integration-jdbc.xsd
   ">
 
     <int:channel id="requestChannel"/>
 
+    <bean id="clientDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+        <property name="driverClassName" value="org.h2.Driver"/>
+        <property name="url" value="jdbc:h2:tcp://localhost:8043/mem:test"/>
+        <property name="username" value="sa"/>
+        <property name="password" value=""/>
+    </bean>
+
+    <int-jdbc:message-store id="clientMessageStore" data-source="clientDataSource" />
+
     <int:gateway id="orderService"
                  service-interface="com.javaprocess.examples.integration.interfaces.IOrderService"
                  default-request-channel="requestChannel"/>
+    <int:chain input-channel="requestChannel">
+        <int-jms:outbound-gateway request-destination="amq.outbound" extract-request-payload="true"/>
+        <int:claim-check-out message-store="clientMessageStore"/>
+    </int:chain>
 
-        <int-jms:outbound-gateway request-channel="requestChannel" 
-                                  request-destination="amq.outbound" extract-request-payload="true"/>
 
 
     <bean id="app" class="com.javaprocess.examples.integration.impl.App">

@@ -1,25 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:jdbc="http://www.springframework.org/schema/jdbc"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xmlns:int="http://www.springframework.org/schema/integration"
        xmlns:int-jms="http://www.springframework.org/schema/integration/jms"
+       xmlns:int-jdbc="http://www.springframework.org/schema/integration/jdbc"
        xmlns:amq="http://activemq.apache.org/schema/core"
        xsi:schemaLocation="
    http://www.springframework.org/schema/beans
    http://www.springframework.org/schema/beans/spring-beans.xsd
+   http://www.springframework.org/schema/jdbc
+   http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
    http://www.springframework.org/schema/integration
    http://www.springframework.org/schema/integration/spring-integration.xsd
    http://www.springframework.org/schema/integration/jms
    http://www.springframework.org/schema/integration/jms/spring-integration-jms.xsd
+   http://www.springframework.org/schema/integration/jdbc
+   http://www.springframework.org/schema/integration/jdbc/spring-integration-jdbc.xsd
    http://activemq.apache.org/schema/core
    http://activemq.apache.org/schema/core/activemq-core.xsd
   ">
 
-    <amq:broker id="activeMQBroker" useJmx="false" persistent="false">
+
+    <amq:broker id="activeMQBroker" useJmx="false" persistent="false"> <!-- 1 -->
         <amq:transportConnectors>
         <amq:transportConnector uri="tcp://localhost:61616" />
         </amq:transportConnectors>
     </amq:broker>
+
+    <bean id="h2DBServer" class="org.h2.tools.Server"
+          factory-method="createTcpServer" init-method="start" destroy-method="stop">
+        <constructor-arg value="-tcp,-tcpAllowOthers,-tcpPort,8043" />
+    </bean>
+
+
+    <bean id="serverDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+        <property name="driverClassName" value="org.h2.Driver"/>
+        <property name="url" value="jdbc:h2:tcp://localhost:8043/mem:test"/>
+        <property name="username" value="sa"/>
+        <property name="password" value=""/>
+    </bean>
+
+    <jdbc:initialize-database data-source="serverDataSource">
+        <jdbc:script location="classpath:org/springframework/integration/jdbc/schema-h2.sql"/>
+    </jdbc:initialize-database>
+
+    <int-jdbc:message-store id="serverMessageStore" data-source="serverDataSource"/>
 
     <bean id="orderServiceHandler" class="com.javaprocess.examples.integration.impl.OrderServiceHandler"/>
 
@@ -28,9 +54,10 @@
     <int-jms:inbound-gateway request-channel="inChannel"
                              request-destination="amq.outbound"
                              concurrent-consumers="10"/>
-    <int:service-activator  input-channel="inChannel"
-                           ref="orderServiceHandler" method="processOrder"/>
-
+    <int:chain  input-channel="inChannel">
+        <int:service-activator ref="orderServiceHandler" method="processOrder"/>
+        <int:claim-check-in message-store="serverMessageStore"/>
+    </int:chain>
 
 
 </beans>
